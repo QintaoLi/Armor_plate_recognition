@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/home/liqintao/learning/装甲板识别/build",
+  "command": "/usr/bin/g++  -isystem /usr/local/include/opencv4 -g -o CMakeFiles/myapp.dir/src/main.cpp.o -c /home/liqintao/learning/装甲板识别/src/main.cpp",
+  "file": "/home/liqintao/learning/装甲板识别/src/main.cpp"
+},
+{
+  "directory": "/home/liqintao/learning/装甲板识别/build",
+  "command": "/usr/bin/g++  -isystem /usr/local/include/opencv4 -g -o CMakeFiles/myapp.dir/src/test.cpp.o -c /home/liqintao/learning/装甲板识别/src/test.cpp",
+  "file": "/home/liqintao/learning/装甲板识别/src/test.cpp"
+},
+{
+  "directory": "/home/liqintao/learning/装甲板识别/build",
+  "command": "/usr/bin/g++  -isystem /usr/local/include/opencv4 -g -o CMakeFiles/myapp.dir/src/test2.cpp.o -c /home/liqintao/learning/装甲板识别/src/test2.cpp",
+  "file": "/home/liqintao/learning/装甲板识别/src/test2.cpp"
+}
+]

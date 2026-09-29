@@ -1,0 +1,3 @@
+/home/liqintao/learning/装甲板识别/build/CMakeFiles/myapp.dir
+/home/liqintao/learning/装甲板识别/build/CMakeFiles/edit_cache.dir
+/home/liqintao/learning/装甲板识别/build/CMakeFiles/rebuild_cache.dir
