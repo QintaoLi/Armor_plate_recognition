@@ -64,7 +64,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
     for(int i=0;i<contours.size();i++)
     {
         double area = cv::contourArea(contours[i]);
-        if (area<10.0 || area > 180.0)
+        if (area<10.0 || area > 150.0)
         {
             continue; 
         }
@@ -80,7 +80,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         float length = std::max(len1, len2);
         float width  = std::min(len1, len2);
         if(width <= 0 || length <= 0) continue;
-        if(length/width>5.0) continue;
+        if(length/width>4.0) continue;
 
         // 长轴单位向量，并统一为朝向图像上方
         cv::Point2f direction = (len1 >= len2 ? edge1 : edge2) / length;
@@ -89,26 +89,29 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         // 相对图像竖直方向的倾角
         float angle = std::atan2(direction.x, -direction.y)
                     * 180.0f / CV_PI;
-        if(angle>20.0f)
+        if(angle>30.0f)
         {
             continue;
         }
 
+        // for(int i=0;i<4;i++)
+        // {
+        //     cv::line(frame,p[i],p[(i+1)%4],cv::Scalar(0,255,0),1);
+        // }
         light.push_back({box,length,width,angle,direction});
     }
     return light;
 }
-
 
 void light_match(cv::Mat& frame,const std::vector<Light_Candidate>&light)
 {
     for(int i=0;i<light.size();i++){
         for(int j=i+1;j<light.size();j++){
             float length_ratio = light[i].length/light[j].length;
-            if(length_ratio>1.5||length_ratio<0.6)continue;
+            if(length_ratio>1.6||length_ratio<0.6)continue;
 
             float width_ratio = light[i].width/light[j].width;
-            if(width_ratio>1.5||width_ratio<0.6)continue;
+            if(width_ratio>1.6||width_ratio<0.6)continue;
 
             float avg_length = (light[i].length+light[j].length)*0.5;
             cv::Point2f p1 = light[i].rect.center;
@@ -124,7 +127,7 @@ void light_match(cv::Mat& frame,const std::vector<Light_Candidate>&light)
                 continue;
 
             if (perpendicular_offset < avg_length ||
-                perpendicular_offset > avg_length * 4.0)
+                perpendicular_offset > avg_length * 4.5f)
                 continue;
 
             float angle_diff = abs(light[i].angle - light[j].angle);
@@ -189,26 +192,6 @@ void light_match(cv::Mat& frame,const std::vector<Light_Candidate>&light)
     }
 }
 
-void middle_draw(cv::Mat& middle,const std::vector<Light_Candidate>& light)
-{
-    for(int i=0;i<light.size();i++){
-        cv::Point2f p[4];
-        light[i].rect.points(p);
-        std::vector<cv::Point> contours(4);
-        for(int i=0;i<4;i++){
-            contours[i] = {cvRound(p[i].x),cvRound(p[i].y)};
-        }
-        cv::polylines(
-            middle,
-            contours,
-            true,
-            cv::Scalar(0,255,0),
-            1,
-            cv::LINE_AA
-        );
-    }
-}
-
 
 int main()
 {
@@ -232,14 +215,9 @@ int main()
         }
         cv::Mat binary = pre_process(frame);
         std::vector<Light_Candidate> light = light_filter(binary,frame); 
-        cv::Mat middle = frame.clone();
-        middle_draw(middle,light);
-        cv::imshow("middle",middle);
         light_match(frame,light);   
         cv::imshow("final",frame);
-        char key = cv::waitKey(delay);
-        if (key == 'q') break;
-        if (key == 's') cv::waitKey(0);
+        if (cv::waitKey(delay) == 'q') break;
     }
     cap.release();
     cv::destroyAllWindows();
