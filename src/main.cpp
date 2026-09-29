@@ -14,6 +14,12 @@ struct Light_Candidate
     cv::Point2f direction;
 };
 
+struct Real_Pair{
+    int i;
+    int j;
+    float score;
+};
+
 cv::Mat pre_process(const cv::Mat& frame)
 {
     cv::Mat blur;
@@ -64,7 +70,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
     for(int i=0;i<contours.size();i++)
     {
         double area = cv::contourArea(contours[i]);
-        if (area<10.0 || area > 150.0)
+        if (area<10.0 || area > 180.0)
         {
             continue; 
         }
@@ -89,7 +95,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         // 相对图像竖直方向的倾角
         float angle = std::atan2(direction.x, -direction.y)
                     * 180.0f / CV_PI;
-        if(angle>30.0f)
+        if(std::abs(angle)>10.0f)
         {
             continue;
         }
@@ -103,8 +109,9 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
     return light;
 }
 
-void light_match(cv::Mat& frame,const std::vector<Light_Candidate>&light)
+std::vector<Real_Pair> light_match(const std::vector<Light_Candidate>&light)
 {
+    std::vector<Real_Pair>pairs;
     for(int i=0;i<light.size();i++){
         for(int j=i+1;j<light.size();j++){
             float length_ratio = light[i].length/light[j].length;
@@ -127,69 +134,103 @@ void light_match(cv::Mat& frame,const std::vector<Light_Candidate>&light)
                 continue;
 
             if (perpendicular_offset < avg_length ||
-                perpendicular_offset > avg_length * 4.5f)
+                perpendicular_offset > avg_length * 7.0f)
                 continue;
 
             float angle_diff = abs(light[i].angle - light[j].angle);
             angle_diff = std::min(angle_diff, 180.0f - angle_diff);
             if(angle_diff > 10)continue;
 
-            const Light_Candidate* left  = &light[i];
-            const Light_Candidate* right = &light[j];
+            float score = 
+                std::abs(light[i].length-light[j].length)/avg_length
+                + std::abs(light[i].width - light[j].width)/
+                    (light[i].width+light[j].width)*0.5
+                + angle_diff 
+                + parallel_offset
+                + perpendicular_offset;
 
-            if (light[i].rect.center.x > light[j].rect.center.x)
-                std::swap(left,right);
-
-            cv::Point2f left_dir = light[i].direction;
-            cv::Point2f right_dir = light[j].direction;
-
-            // 让两根灯条的方向一致，避免四边形交叉
-            if (left_dir.dot(right_dir) < 0)
-                right_dir *= -1.0f;
-
-            // 图像坐标中，y 增大的方向向下
-            if (left_dir.y < 0)
-            {
-                left_dir  *= -1.0f;
-                right_dir *= -1.0f;
-            }
-
-            // 计算上下端点
-            cv::Point2f leftTop =
-                left->rect.center - left_dir * (left->length * 0.5f);
-
-            cv::Point2f leftBottom =
-                left->rect.center + left_dir * (left->length * 0.5f);
-
-            cv::Point2f rightTop =
-                right->rect.center - right_dir * (right->length * 0.5f);
-
-            cv::Point2f rightBottom =
-                right->rect.center + right_dir * (right->length * 0.5f);
-
-            // 按顺时针顺序连接
-            auto toPoint = [](const cv::Point2f& p)
-            {
-                return cv::Point(cvRound(p.x), cvRound(p.y));
-            };
-
-            std::vector<cv::Point> poly_rect = {
-                toPoint(leftTop),
-                toPoint(rightTop),
-                toPoint(rightBottom),
-                toPoint(leftBottom)
-            };
-
-            cv::polylines(
-                frame,
-                poly_rect,
-                true,              
-                cv::Scalar(0, 255, 0), 
-                1,
-                cv::LINE_AA
-            );
+            pairs.push_back({i,j,score});
         }
     }
+    std::sort(
+        pairs.begin(),
+        pairs.end(),
+        [](const Real_Pair& a,const Real_Pair& b)
+        {
+            return a.score<b.score;
+        }
+    );
+    return pairs;
+}
+
+void draw_rect(
+    cv::Mat& frame,
+    std::vector<Light_Candidate>light,
+    std::vector<Real_Pair>pairs
+)
+{
+    std::vector<bool>used(light.size(),false);
+    for(auto& pair:pairs){
+        if(used[pair.i]||used[pair.j])continue;
+
+        const Light_Candidate* left  = &light[pair.i];
+        const Light_Candidate* right = &light[pair.j];
+        if (light[pair.i].rect.center.x > light[pair.j].rect.center.x)
+            std::swap(left,right);
+
+        cv::Point2f left_dir = left->direction;
+        cv::Point2f right_dir = right->direction;
+
+        // 让两根灯条的方向一致，避免四边形交叉
+        if (left_dir.dot(right_dir) < 0)
+            right_dir *= -1.0f;
+
+        // 图像坐标中，y 增大的方向向下
+        if (left_dir.y < 0)
+        {
+            left_dir  *= -1.0f;
+            right_dir *= -1.0f;
+        }
+
+        // 计算上下端点
+        cv::Point2f leftTop =
+            left->rect.center - left_dir * (left->length * 0.5f);
+
+        cv::Point2f leftBottom =
+            left->rect.center + left_dir * (left->length * 0.5f);
+
+        cv::Point2f rightTop =
+            right->rect.center - right_dir * (right->length * 0.5f);
+
+        cv::Point2f rightBottom =
+            right->rect.center + right_dir * (right->length * 0.5f);
+
+        // 按顺时针顺序连接
+        auto toPoint = [](const cv::Point2f& p)
+        {
+            return cv::Point(cvRound(p.x), cvRound(p.y));
+        };
+
+        std::vector<cv::Point> poly_rect = {
+            toPoint(leftTop),
+            toPoint(rightTop),
+            toPoint(rightBottom),
+            toPoint(leftBottom)
+        };
+
+        cv::polylines(
+            frame,
+            poly_rect,
+            true,              
+            cv::Scalar(0, 255, 0), 
+            1,
+            cv::LINE_AA
+        );
+
+        used[pair.i]=true;
+        used[pair.j]=true;
+    }
+    
 }
 
 
@@ -215,9 +256,13 @@ int main()
         }
         cv::Mat binary = pre_process(frame);
         std::vector<Light_Candidate> light = light_filter(binary,frame); 
-        light_match(frame,light);   
+        std::vector<Real_Pair> pairs = light_match(light); 
+        draw_rect(frame,light,pairs);
         cv::imshow("final",frame);
-        if (cv::waitKey(delay) == 'q') break;
+        char key = cv::waitKey(delay);
+        // 按'q'退出，按's'停止
+        if (key == 'q') break;
+        if (key == 's') cv::waitKey(0);
     }
     cap.release();
     cv::destroyAllWindows();
