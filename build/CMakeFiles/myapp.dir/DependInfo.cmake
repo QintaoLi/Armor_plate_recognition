@@ -10,7 +10,6 @@ set(CMAKE_DEPENDS_LANGUAGES
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/liqintao/learning/装甲板识别/src/main.cpp" "CMakeFiles/myapp.dir/src/main.cpp.o" "gcc" "CMakeFiles/myapp.dir/src/main.cpp.o.d"
   "/home/liqintao/learning/装甲板识别/src/test.cpp" "CMakeFiles/myapp.dir/src/test.cpp.o" "gcc" "CMakeFiles/myapp.dir/src/test.cpp.o.d"
-  "/home/liqintao/learning/装甲板识别/src/test2.cpp" "CMakeFiles/myapp.dir/src/test2.cpp.o" "gcc" "CMakeFiles/myapp.dir/src/test2.cpp.o.d"
   )
 
 # Targets to which this target links.

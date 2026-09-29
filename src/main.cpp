@@ -86,7 +86,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         float length = std::max(len1, len2);
         float width  = std::min(len1, len2);
         if(width <= 0 || length <= 0) continue;
-        if(length/width>4.0) continue;
+        if(length/width>6.0) continue;
 
         // 长轴单位向量，并统一为朝向图像上方
         cv::Point2f direction = (len1 >= len2 ? edge1 : edge2) / length;
@@ -95,7 +95,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         // 相对图像竖直方向的倾角
         float angle = std::atan2(direction.x, -direction.y)
                     * 180.0f / CV_PI;
-        if(std::abs(angle)>10.0f)
+        if(std::abs(angle)>15.0f)
         {
             continue;
         }
@@ -124,22 +124,26 @@ std::vector<Real_Pair> light_match(const std::vector<Light_Candidate>&light)
             cv::Point2f p1 = light[i].rect.center;
             cv::Point2f p2 = light[j].rect.center;
             cv::Point2f delta = p1 - p2;
-            cv::Point2f axis = light[i].direction;
+
+            cv::Point2f dir1 = light[i].direction;
+            cv::Point2f dir2 = light[j].direction;
+            cv::Point2f dir = dir1 + dir2;
+            float dir_length = cv::norm(dir);
+            cv::Point2f axis = dir/dir_length;
             cv::Point2f normal(-axis.y, axis.x);
 
             float parallel_offset = std::abs(delta.dot(axis));
             float perpendicular_offset = std::abs(delta.dot(normal));
 
-            if (parallel_offset > avg_length * 0.3f)
+            if (parallel_offset > avg_length * 0.6)
                 continue;
 
             if (perpendicular_offset < avg_length ||
-                perpendicular_offset > avg_length * 7.0f)
+                perpendicular_offset > avg_length * 5.0)
                 continue;
 
             float angle_diff = abs(light[i].angle - light[j].angle);
-            angle_diff = std::min(angle_diff, 180.0f - angle_diff);
-            if(angle_diff > 10)continue;
+            if(angle_diff > 15)continue;
 
             float score = 
                 std::abs(light[i].length-light[j].length)/avg_length
@@ -147,7 +151,7 @@ std::vector<Real_Pair> light_match(const std::vector<Light_Candidate>&light)
                     (light[i].width+light[j].width)*0.5
                 + angle_diff 
                 + parallel_offset
-                + perpendicular_offset;
+                + perpendicular_offset*5;
 
             pairs.push_back({i,j,score});
         }

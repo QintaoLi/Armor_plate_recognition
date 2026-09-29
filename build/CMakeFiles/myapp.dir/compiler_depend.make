@@ -417,11 +417,6 @@ CMakeFiles/myapp.dir/src/main.cpp.o: ../src/main.cpp \
 CMakeFiles/myapp.dir/src/test.cpp.o: ../src/test.cpp \
   /usr/include/stdc-predef.h
 
-CMakeFiles/myapp.dir/src/test2.cpp.o: ../src/test2.cpp \
-  /usr/include/stdc-predef.h
-
-
-../src/test2.cpp:
 
 ../src/test.cpp:
 
