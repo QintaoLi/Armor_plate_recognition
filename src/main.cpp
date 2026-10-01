@@ -40,15 +40,15 @@ cv::Mat pre_process(const cv::Mat& frame)
     cv::Mat diff_blue, binary_blue;
     cv::subtract(blue_ch, red_ch, diff_blue);
     double otsu_blue = cv::threshold(diff_blue, binary_blue, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-    if (otsu_blue < 80) {
-        cv::threshold(diff_blue, binary_blue, 100, 255, cv::THRESH_BINARY);
+    if (otsu_blue < 130) {
+        cv::threshold(diff_blue, binary_blue, 130, 255, cv::THRESH_BINARY);
     }
 
     // 提取红色灯条 (R - B)
     cv::Mat diff_red, binary_red;
     cv::subtract(red_ch, blue_ch, diff_red);
     double otsu_red = cv::threshold(diff_red, binary_red, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-    if (otsu_red < 80) {
+    if (otsu_red < 100) {
         cv::threshold(diff_red, binary_red, 100, 255, cv::THRESH_BINARY);
     }
 
@@ -86,7 +86,14 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         float length = std::max(len1, len2);
         float width  = std::min(len1, len2);
         if(width <= 0 || length <= 0) continue;
-        if(length/width>6.0) continue;
+        if(length>50||width>20)continue;
+        if(width*length>130)
+        {
+             if(length/width>5.0) continue;
+        }else
+        {
+             if(length/width>4.0) continue;
+        }
 
         // 长轴单位向量，并统一为朝向图像上方
         cv::Point2f direction = (len1 >= len2 ? edge1 : edge2) / length;
@@ -95,7 +102,7 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
         // 相对图像竖直方向的倾角
         float angle = std::atan2(direction.x, -direction.y)
                     * 180.0f / CV_PI;
-        if(std::abs(angle)>15.0f)
+        if(std::abs(angle)>20.0f)
         {
             continue;
         }
@@ -109,16 +116,20 @@ std::vector<Light_Candidate> light_filter(const cv::Mat& binary,cv::Mat& frame)
     return light;
 }
 
-std::vector<Real_Pair> light_match(const std::vector<Light_Candidate>&light)
+std::vector<Real_Pair>light_match (const std::vector<Light_Candidate>&light)
 {
     std::vector<Real_Pair>pairs;
     for(int i=0;i<light.size();i++){
         for(int j=i+1;j<light.size();j++){
             float length_ratio = light[i].length/light[j].length;
-            if(length_ratio>1.6||length_ratio<0.6)continue;
+            if(std::max(light[i].length,light[j].length)>15.0){
+                if(length_ratio>1.2||length_ratio<0.83)continue;
+            }else{
+                if(length_ratio>1.6||length_ratio<0.62)continue;
+            }
 
             float width_ratio = light[i].width/light[j].width;
-            if(width_ratio>1.6||width_ratio<0.6)continue;
+            if(width_ratio>2.0||width_ratio<0.5)continue;
 
             float avg_length = (light[i].length+light[j].length)*0.5;
             cv::Point2f p1 = light[i].rect.center;
@@ -135,23 +146,23 @@ std::vector<Real_Pair> light_match(const std::vector<Light_Candidate>&light)
             float parallel_offset = std::abs(delta.dot(axis));
             float perpendicular_offset = std::abs(delta.dot(normal));
 
-            if (parallel_offset > avg_length * 0.6)
+            if (parallel_offset > avg_length * 0.8)
                 continue;
 
             if (perpendicular_offset < avg_length ||
-                perpendicular_offset > avg_length * 5.0)
+                perpendicular_offset > avg_length * 5.3)
                 continue;
 
             float angle_diff = abs(light[i].angle - light[j].angle);
-            if(angle_diff > 15)continue;
+            if(angle_diff > 27.0)continue;
 
             float score = 
                 std::abs(light[i].length-light[j].length)/avg_length
                 + std::abs(light[i].width - light[j].width)/
                     (light[i].width+light[j].width)*0.5
-                + angle_diff 
-                + parallel_offset
-                + perpendicular_offset*5;
+                + angle_diff /20.0
+                + parallel_offset /avg_length
+                + perpendicular_offset / avg_length;
 
             pairs.push_back({i,j,score});
         }
@@ -169,8 +180,8 @@ std::vector<Real_Pair> light_match(const std::vector<Light_Candidate>&light)
 
 void draw_rect(
     cv::Mat& frame,
-    std::vector<Light_Candidate>light,
-    std::vector<Real_Pair>pairs
+    std::vector<Light_Candidate>&light,
+    std::vector<Real_Pair>&pairs
 )
 {
     std::vector<bool>used(light.size(),false);
